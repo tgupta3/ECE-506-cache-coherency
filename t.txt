@@ -1,0 +1,52 @@
+===== Simulator configuration =====
+BLOCKSIZE:           8192
+L1_SIZE:                  8
+L1_ASSOC:             64
+VC_NUM_BLOCKS:          4
+L2_SIZE:                  1
+L2_ASSOC:trace/canneal.04t.longTrace
+trace_file:trace/canneal.04t.longTrace
+112661
+9154
+11942
+39
+Bus RDX 39
+intervention 1921
+invalidations 2004
+Memory Flush 63
+Writebacks 959
+memory transaction 3359
+Cache 2 Cache 6793
+110830
+8961
+11710
+41
+Bus RDX 41
+intervention 1863
+invalidations 2025
+Memory Flush 62
+Writebacks 925
+memory transaction 3227
+Cache 2 Cache 6700
+114938
+8961
+12383
+42
+Bus RDX 42
+intervention 1879
+invalidations 1997
+Memory Flush 65
+Writebacks 945
+memory transaction 3215
+Cache 2 Cache 6733
+113428
+9057
+12108
+39
+Bus RDX 39
+intervention 1917
+invalidations 2007
+Memory Flush 66
+Writebacks 935
+memory transaction 3257
+Cache 2 Cache 6774
