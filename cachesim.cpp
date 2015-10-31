@@ -47,7 +47,7 @@ class cache_set{
 				vector<bool> valid;
 				vector<bool> dirty;
 				vector<int> LRU;
-				vector<int> state; //0 for invalid 1 for shared 2 for modified 3 for exclusive
+				vector<int> state; //0 for invalid 1 for shared 2 for modified 3 for exclusive For dragon 0 for shared clean,1 for shared modified
 				vector<string> victim_TAG;
 				
 		
@@ -118,6 +118,8 @@ int read_request(string,int);
 void write_request(string,int);
 void write_request1(string,int);
 int read_request1(string,int);
+void write_request2(string,int);
+int read_request2(string,int);
 
 void write_request(string write_addr,int cache_no)
 {
@@ -803,6 +805,35 @@ int main(int argc, char* argv[])
 	}										 
 	}
 
+	if(protocol==2)
+	{	
+	while(trace_file && getline(trace_file, linebuffer)){
+		
+		if(linebuffer.length()==0) continue;
+		
+  		rw=linebuffer.substr(2,1);
+  		string processor1=linebuffer.substr(0,1);
+  		processor=atoi(processor1.c_str());
+  		
+		linebuffer=trace_address(linebuffer.substr(linebuffer.length()-8));
+
+		if(rw[0]=='w')
+		{
+			count++;
+			//cout<<count<<endl;
+			write_request2(linebuffer,processor);
+		}
+		if(rw[0]=='r')
+		{	
+			count++;
+			
+			hit=read_request2(linebuffer,processor);
+			
+		}
+		
+	}										 
+	}
+
 	
 
 
@@ -1164,6 +1195,404 @@ return 1;
 
 
 }	
+
+void write_request2(string write_addr,int cache_no)
+{
+	string TAG;
+	string INDEX;
+	int INDEX1;
+	unsigned int LRU_replace;
+	int dirty_replace;
+	string rep_addr;
+	int hit;
+	
+	cachep[cache_no].WRITE++;
+	
+	write_addr=hex2bin(write_addr);
+	//cout<<write_addr<<endl;
+	TAG=write_addr.substr(0,(write_addr.length()-cachep[cache_no].INDEX_SIZE-cachep[cache_no].BLOCK_OFFSET_BITS));
+	INDEX=write_addr.substr(TAG.length(),cachep[cache_no].INDEX_SIZE);
+	int TAG_match=-1;
+	TAG=bin2hex(TAG);
+	INDEX1=bin2dec(INDEX);
+	int victim_match_block;
+
+	unsigned int assoc=find(cache[cache_no].cacheset[INDEX1].valid.begin(),cache[cache_no].cacheset[INDEX1].valid.end(),false)-cache[cache_no].cacheset[INDEX1].valid.begin();
+	
+	for(unsigned int i=0;i<cache[cache_no].cacheset[INDEX1].LRU.size();i++)
+	{
+		if((cache[cache_no].cacheset[INDEX1].valid[i]!=false)&&(TAG==cache[cache_no].cacheset[INDEX1].TAG[i]))
+		   {
+			TAG_match=i;
+			 break;
+		   } 
+	}
+
+	if(TAG_match!=-1) //hit
+	{
+		int get_state=cache[cache_no].cacheset[INDEX1].state[TAG_match];
+
+		//cout<<get_state<<endl;
+		if(get_state==2 || get_state==3)
+		{
+
+			cache[cache_no].cacheset[INDEX1].state[TAG_match]=2;
+			cache[cache_no].cacheset[INDEX1].TAG[TAG_match]=TAG;
+			
+			for(unsigned int i=0;i<cache[cache_no].cacheset[INDEX1].LRU.size();i++)
+					{
+						if((cache[cache_no].cacheset[INDEX1].LRU[i]<cache[cache_no].cacheset[INDEX1].LRU[TAG_match])&&(cache[cache_no].cacheset[INDEX1].valid[i]!=false))
+							cache[cache_no].cacheset[INDEX1].LRU[i]++;
+					}	
+			cache[cache_no].cacheset[INDEX1].LRU[TAG_match]=0;
+		}
+
+		if (get_state==0 || get_state ==1)
+		{
+			//check if copies exist in other sets and change state accordingly
+			int proc_copy=0;
+			//Issue bus upgrade
+			for(int i=0;i<num_processors;i++)  //check for bus read command
+				{
+						if(i!=cache_no)
+						{
+							int TAG_match_processor=find(cache[i].cacheset[INDEX1].TAG.begin(),cache[i].cacheset[INDEX1].TAG.end(),TAG)-cache[i].cacheset[INDEX1].TAG.begin();
+							if(TAG_match_processor<cache[i].cacheset[INDEX1].TAG.size()) //found in processor
+							{
+								int current_state=cache[i].cacheset[INDEX1].state[TAG_match_processor];
+								proc_copy=1;
+
+								if(current_state==1 || current_state==0) //shared modified and shared clean state
+								{
+
+									
+									cache[i].cacheset[INDEX1].state[TAG_match_processor]=0;
+									
+
+								/*for (unsigned int j=0;j<cache[i].cacheset[INDEX1].LRU.size();j++)
+									{
+										if((cache[i].cacheset[INDEX1].state[j]!=0)&&(cache[i].cacheset[INDEX1].LRU[j]>cache[i].cacheset[INDEX1].LRU[TAG_match_processor]))
+										{
+											cache[i].cacheset[INDEX1].LRU[j]--;
+											//cache[i].cacheset[INDEX1].LRU[TAG_match_processor]++;
+
+										}
+
+									}
+									cache[i].cacheset[INDEX1].LRU[TAG_match_processor]=cachep[i].ASSOC-1;*/
+
+
+
+								}
+							}
+						}
+				}	
+
+			if(proc_copy==1)
+			{
+				cache[cache_no].cacheset[INDEX1].state[TAG_match]=1;
+				cache[cache_no].cacheset[INDEX1].TAG[TAG_match]=TAG;
+
+			}
+			if(proc_copy==0)
+			{
+				cache[cache_no].cacheset[INDEX1].state[TAG_match]=2;
+				cache[cache_no].cacheset[INDEX1].TAG[TAG_match]=TAG;
+			}	
+
+			for(unsigned int i=0;i<cache[cache_no].cacheset[INDEX1].LRU.size();i++)
+					{
+						if((cache[cache_no].cacheset[INDEX1].LRU[i]<cache[cache_no].cacheset[INDEX1].LRU[TAG_match])&&(cache[cache_no].cacheset[INDEX1].valid[i]!=false))
+							cache[cache_no].cacheset[INDEX1].LRU[i]++;
+					}	
+			cache[cache_no].cacheset[INDEX1].LRU[TAG_match]=0;
+
+		
+
+
+		}	
+
+
+
+	}
+
+	else //miss
+	{
+		cachep[cache_no].WRITES_MISSES++;
+		if(assoc>=cache[cache_no].cacheset[INDEX1].state.size()) //set is full and tag doesnt matcgh
+		{
+			assoc=distance(cache[cache_no].cacheset[INDEX1].LRU.begin(),max_element(cache[cache_no].cacheset[INDEX1].LRU.begin(),cache[cache_no].cacheset[INDEX1].LRU.end()));
+			dirty_replace=cache[cache_no].cacheset[INDEX1].state[assoc];
+			cache[cache_no].cacheset[INDEX1].valid[assoc]=false;
+			if(dirty_replace==2 || dirty_replace==1)  //Block is in dirty state ,perform write back to memory
+				{
+					cachep[cache_no].WRITE_BACKS++; 
+
+				}
+		}
+		int proc_copy=0;
+		//Issue bus read
+		for(int i=0;i<num_processors;i++)
+		{
+			if(i!=cache_no)
+			{
+
+				int TAG_match_processor=find(cache[i].cacheset[INDEX1].TAG.begin(),cache[i].cacheset[INDEX1].TAG.end(),TAG)-cache[i].cacheset[INDEX1].TAG.begin();
+				if(TAG_match_processor<cache[i].cacheset[INDEX1].TAG.size())
+				{
+					int current_state=cache[i].cacheset[INDEX1].state[TAG_match_processor];
+								
+								if(current_state==3 || current_state==0) //exclusive or sc state
+									cache[i].cacheset[INDEX1].state[TAG_match_processor]=0; 
+										
+								if(current_state==1 || current_state==2)
+										{
+											//cachep[i].WRITE_BACKS++;
+											cout<<current_state<<endl;
+											cachep[i].memory_flush++;
+											cache[i].cacheset[INDEX1].state[TAG_match_processor]=1; 
+
+										}
+									
+								if(current_state==2 || current_state==3)
+										cachep[i].intervention++;
+
+								cache[i].cacheset[INDEX1].TAG[TAG_match_processor]=TAG;	
+					
+
+					proc_copy=1;
+
+
+				}	
+			
+
+
+			}
+
+		}
+		if(proc_copy==1)
+		{
+			cache[cache_no].cacheset[INDEX1].state[assoc]=1;
+			cache[cache_no].cacheset[INDEX1].TAG[assoc]=TAG;
+			cache[cache_no].cacheset[INDEX1].valid[assoc]=true;
+			//Issue bus upgrde
+
+			for(int i=0;i<num_processors;i++)  //check for bus read command
+				{
+						if(i!=cache_no)
+						{
+							int TAG_match_processor=find(cache[i].cacheset[INDEX1].TAG.begin(),cache[i].cacheset[INDEX1].TAG.end(),TAG)-cache[i].cacheset[INDEX1].TAG.begin();
+							if(TAG_match_processor<cache[i].cacheset[INDEX1].TAG.size()) //found in processor
+							{
+								int current_state=cache[i].cacheset[INDEX1].state[TAG_match_processor];
+								proc_copy=1;
+
+								if(current_state==1 || current_state==0) //shared modified and shared clean state
+								{
+									
+									
+									cache[i].cacheset[INDEX1].state[TAG_match_processor]=0;
+									
+
+								/*for (unsigned int j=0;j<cache[i].cacheset[INDEX1].LRU.size();j++)
+									{
+										if((cache[i].cacheset[INDEX1].state[j]!=0)&&(cache[i].cacheset[INDEX1].LRU[j]>cache[i].cacheset[INDEX1].LRU[TAG_match_processor]))
+										{
+											cache[i].cacheset[INDEX1].LRU[j]--;
+											//cache[i].cacheset[INDEX1].LRU[TAG_match_processor]++;
+
+										}
+
+									}
+									cache[i].cacheset[INDEX1].LRU[TAG_match_processor]=cachep[i].ASSOC-1;*/
+
+
+
+								}
+							}
+						}
+				}	
+
+		}
+
+		if(proc_copy==0)
+		{
+
+			cache[cache_no].cacheset[INDEX1].state[assoc]=2;
+			cache[cache_no].cacheset[INDEX1].TAG[assoc]=TAG;
+			cache[cache_no].cacheset[INDEX1].valid[assoc]=true;
+		}	
+
+		for(unsigned int i=0;i<cache[cache_no].cacheset[INDEX1].LRU.size();i++)
+					{
+						if((cache[cache_no].cacheset[INDEX1].LRU[i]<cache[cache_no].cacheset[INDEX1].LRU[assoc])&&(cache[cache_no].cacheset[INDEX1].valid[i]!=false))
+							cache[cache_no].cacheset[INDEX1].LRU[i]++;
+					}	
+		cache[cache_no].cacheset[INDEX1].LRU[assoc]=0;
+
+
+
+	}	
+
+}
+
+
+
+int read_request2(string read_addr,int cache_no)
+{
+	
+	cachep[cache_no].READS++;	
+	
+	string TAG;
+	string INDEX;
+	int INDEX1;
+	unsigned int LRU_replace;
+	int dirty_replace;
+	string rep_addr;
+	int TAG_match=-1;
+	int hit;
+	
+	
+	read_addr=hex2bin(read_addr);
+	TAG=read_addr.substr(0,(read_addr.length()-cachep[cache_no].INDEX_SIZE-cachep[cache_no].BLOCK_OFFSET_BITS));
+	INDEX=read_addr.substr(TAG.length(),cachep[cache_no].INDEX_SIZE);
+	TAG=bin2hex(TAG);
+	
+	unsigned int victim_match_block;
+	INDEX1=bin2dec(INDEX);
+
+	unsigned int assoc=find(cache[cache_no].cacheset[INDEX1].valid.begin(),cache[cache_no].cacheset[INDEX1].valid.end(),false)-cache[cache_no].cacheset[INDEX1].valid.begin();
+	
+	for(unsigned int i=0;i<cache[cache_no].cacheset[INDEX1].LRU.size();i++)
+	{
+		if((cache[cache_no].cacheset[INDEX1].valid[i]!=false)&&(TAG==cache[cache_no].cacheset[INDEX1].TAG[i]))
+		   {
+			TAG_match=i;
+			 break;
+		   } 
+	}
+
+	if(TAG_match!=-1) //Tag match
+	{
+		
+
+		
+		//cout<<cache[cache_no].cacheset[INDEX1].state[TAG_match]<<endl;
+		cache[cache_no].cacheset[INDEX1].TAG[TAG_match]=TAG;
+			for(unsigned int i=0;i<cache[cache_no].cacheset[INDEX1].LRU.size();i++)
+					{
+						if((cache[cache_no].cacheset[INDEX1].LRU[i]<cache[cache_no].cacheset[INDEX1].LRU[TAG_match])&&(cache[cache_no].cacheset[INDEX1].valid[i]!=false))
+							cache[cache_no].cacheset[INDEX1].LRU[i]++;
+					}	
+		cache[cache_no].cacheset[INDEX1].LRU[TAG_match]=0;
+
+	}
+
+	else
+	{
+		cachep[cache_no].READS_MISSES++;
+		if(assoc>=cache[cache_no].cacheset[INDEX1].state.size()) //set is full and tag doesnt matcsh
+		{
+			assoc=distance(cache[cache_no].cacheset[INDEX1].LRU.begin(),max_element(cache[cache_no].cacheset[INDEX1].LRU.begin(),cache[cache_no].cacheset[INDEX1].LRU.end()));
+			dirty_replace=cache[cache_no].cacheset[INDEX1].state[assoc];
+			cache[cache_no].cacheset[INDEX1].valid[assoc]=false;
+			if(dirty_replace==2 || dirty_replace==1)  //Block is in dirty state ,perform write back to memory
+				{
+					cachep[cache_no].WRITE_BACKS++; 
+
+				}
+			
+		}
+
+		int lru_u=0;
+		int proc_copy=0;
+		//Issue bus rd, state will depend upon the outcome of bus read
+		for(int i=0;i<num_processors;i++)  //check for bus read command
+				{
+						
+						if(i!=cache_no)
+						{
+							int TAG_match_processor=find(cache[i].cacheset[INDEX1].TAG.begin(),cache[i].cacheset[INDEX1].TAG.end(),TAG)-cache[i].cacheset[INDEX1].TAG.begin();
+							if(TAG_match_processor<cache[i].cacheset[INDEX1].TAG.size()) //found in processor
+							{
+								
+								int current_state=cache[i].cacheset[INDEX1].state[TAG_match_processor];
+								
+								if(current_state==3 || current_state==0) //exclusive or sc state
+									cache[i].cacheset[INDEX1].state[TAG_match_processor]=0; 
+										
+								if(current_state==1 || current_state==2)
+										{
+											//cachep[i].WRITE_BACKS++;
+											cout<<current_state<<endl;
+											cachep[i].memory_flush++;
+											cache[i].cacheset[INDEX1].state[TAG_match_processor]=1; 
+
+										}
+
+								if(current_state==2 || current_state==3)
+										cachep[i].intervention++;	
+
+								cache[i].cacheset[INDEX1].TAG[TAG_match_processor]=TAG;	
+									
+								proc_copy=1;
+									/*if(0)
+									{	
+									for (unsigned int j=0;j<cache[i].cacheset[INDEX1].LRU.size();j++)
+									{
+										if((cache[i].cacheset[INDEX1].state[j]!=0)&&(cache[i].cacheset[INDEX1].LRU[j]<cache[i].cacheset[INDEX1].LRU[TAG_match_processor]))
+										{
+											cache[i].cacheset[INDEX1].LRU[j]++;
+
+										}
+
+									}
+									cache[i].cacheset[INDEX1].LRU[TAG_match_processor]=0;
+									if(current_state==1)
+									     		lru_u=1;
+								}	*/
+
+									
+
+
+
+
+							}
+						}
+				}	
+
+			if(proc_copy==1)
+				{	cache[cache_no].cacheset[INDEX1].state[assoc]=0; 
+					cache[cache_no].cacheset[INDEX1].valid[assoc]=true;
+					
+				}
+
+			if(proc_copy==0) {
+					cache[cache_no].cacheset[INDEX1].state[assoc]=3; 
+					cache[cache_no].cacheset[INDEX1].valid[assoc]=true; }	
+			
+
+
+			//cout<<cache[cache_no].cacheset[INDEX1].state[assoc]<<endl;
+
+			cache[cache_no].cacheset[INDEX1].TAG[assoc]=TAG;
+			for(unsigned int i=0;i<cache[cache_no].cacheset[INDEX1].LRU.size();i++)
+					{
+						if((cache[cache_no].cacheset[INDEX1].LRU[i]<cache[cache_no].cacheset[INDEX1].LRU[assoc])&&(cache[cache_no].cacheset[INDEX1].valid[i]!=false))
+							cache[cache_no].cacheset[INDEX1].LRU[i]++;
+					}	
+
+			cache[cache_no].cacheset[INDEX1].LRU[assoc]=0;
+
+
+
+	}
+
+
+return 1;
+
+}	
+
 
 
 
