@@ -701,23 +701,7 @@ int main(int argc, char* argv[])
 		victimp[i].ASSOC=0;
 		
 		
-	}
-	//VIctim Initialization ended	
-		
-		cout<<"===== Simulator configuration ====="<<endl;
-		
-		cout<<"BLOCKSIZE:"<<setw(15)<<argv[1]<<endl;
-		cout<<"L1_SIZE:"<<setw(19)<<argv[2]<<endl;;
-		cout<<"L1_ASSOC:"<<setw(15)<<argv[3]<<endl;
-		cout<<"VC_NUM_BLOCKS:"<<setw(11)<<argv[4]<<endl;
-		cout<<"L2_SIZE:"<<setw(19)<<argv[5]<<endl;
-		cout<<"L2_ASSOC:"<<setw(15)<<argv[6]<<endl;
-		cout<<"trace_file:"<<setw(25)<<argv[6]<<endl;
-		
-
-			
-		
-		
+	}	
 	
 		cache.resize(num_processors);
 	
@@ -835,7 +819,22 @@ int main(int argc, char* argv[])
 	}
 
 	
-
+	printf("===== 506 Personal information =====\n");
+	printf("Tushar Gupta\n");	
+	printf("200108328\n");
+	printf("ECE492 Students? NO\n");
+	printf("===== 506 SMP Simulator configuration =====\n");
+	printf("L1_SIZE:		%d\n",cachep[0].SIZE);
+	printf("L1_ASSOC:		%d\n",cachep[0].ASSOC);
+	printf("L1_BLOCKSIZE:		%d\n",cachep[0].BLOCKSIZE);
+	printf("NUMBER OF PROCESSORS:	%d\n",num_processors);
+	if(protocol == 0)
+		printf("COHERENCE PROTOCOL:	MSI\n");
+	else if(protocol == 1)
+		printf("COHERENCE PROTOCOL:	MESI\n");
+	else if(protocol == 2)
+		printf("COHERENCE PROTOCOL:	Dragon\n");
+	cout<<"TRACE FILE: "<<argv[6]<<endl;;
 
 	
 	
@@ -845,19 +844,20 @@ int main(int argc, char* argv[])
 	
 	for(unsigned int i=0;i<num_processors;i++)
 	{
-		cout<<cachep[i].READS<<endl;
-		cout<<cachep[i].READS_MISSES<<endl;
-		cout<<cachep[i].WRITE<<endl;
-		cout<<cachep[i].WRITES_MISSES<<endl;
-		cout<<"Bus RDX "<<cachep[i].bus_rdx<<endl;
-		cout<<"intervention "<<cachep[i].intervention<<endl;
-		cout<<"invalidations "<<cachep[i].invalidations<<endl;
-		cout<<"Memory Flush "<<cachep[i].memory_flush<<endl; 
-		cout<<"Writebacks "<<cachep[i].WRITE_BACKS<<endl;
-		cout<<"memory transaction "<<cachep[i].someone+cachep[i].WRITE_BACKS+cachep[i].READS_MISSES+cachep[i].WRITES_MISSES-cachep[i].cache2cache<<endl;
-		cout<<"Cache 2 Cache "<<cachep[i].cache2cache<<endl;
-	}
-
+		cout<<"============ Simulation results (Cache "<<i<<") ============"<<endl;
+		cout<<"01. number of reads: "<<cachep[i].READS<<endl;
+		cout<<"02. number of read misses: "<<cachep[i].READS_MISSES<<endl;
+		cout<<"03. number of writes: "<<cachep[i].WRITE<<endl;
+		cout<<"04. number of write misses: "<<cachep[i].WRITES_MISSES<<endl;
+		cout<<"05. total miss rate: "<<setprecision(2)<<fixed<<((float)cachep[i].READS_MISSES+(float)cachep[i].WRITES_MISSES)*(100)/((float)cachep[i].READS+(float)cachep[i].WRITE)<<"%"<<endl;
+		cout<<"06. number of writebacks: "<<cachep[i].WRITE_BACKS<<endl;
+		cout<<"07. number of cache-to-cache transfers: "<<cachep[i].cache2cache<<endl;
+		cout<<"08. number of memory transactions: "<<cachep[i].someone+cachep[i].WRITE_BACKS+cachep[i].READS_MISSES+cachep[i].WRITES_MISSES-cachep[i].cache2cache<<endl;
+		cout<<"09. number of interventions: "<<cachep[i].intervention<<endl;
+		cout<<"10. number of invalidations: "<<cachep[i].invalidations<<endl;
+		cout<<"11. number of flushes:  "<<cachep[i].memory_flush<<endl; 
+		cout<<"12. number of BusRdX: "<<cachep[i].bus_rdx<<endl;
+}
 	
 	return 0;
 }
@@ -1348,7 +1348,7 @@ void write_request2(string write_addr,int cache_no)
 								if(current_state==1 || current_state==2)
 										{
 											//cachep[i].WRITE_BACKS++;
-											cout<<current_state<<endl;
+											//cout<<current_state<<endl;
 											cachep[i].memory_flush++;
 											cache[i].cacheset[INDEX1].state[TAG_match_processor]=1; 
 
@@ -1524,7 +1524,7 @@ int read_request2(string read_addr,int cache_no)
 								if(current_state==1 || current_state==2)
 										{
 											//cachep[i].WRITE_BACKS++;
-											cout<<current_state<<endl;
+											//cout<<current_state<<endl;
 											cachep[i].memory_flush++;
 											cache[i].cacheset[INDEX1].state[TAG_match_processor]=1; 
 
